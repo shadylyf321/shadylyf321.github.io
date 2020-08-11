@@ -3,12 +3,12 @@
 ## Source: https://github.com/hexojs/hexo/
 
 # Site
-title: Hexo
-subtitle: ''
-description: ''
+title: ShadyLYF
+subtitle: Keep Dreaming
+description: Game developer
 keywords:
-author: John Doe
-language: en
+author: ShadyLYF
+language: zh-CN
 timezone: ''
 
 # URL
@@ -98,7 +98,7 @@ ignore:
 # Extensions
 ## Plugins: https://hexo.io/plugins/
 ## Themes: https://hexo.io/themes/
-theme: landscape
+theme: next
 
 # Deployment
 ## Docs: https://hexo.io/docs/deployment.html
