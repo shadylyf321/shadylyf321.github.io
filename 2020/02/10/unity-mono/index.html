@@ -270,6 +270,7 @@ D --> G[Linux CLR]</pre>
 
           </div>
           
+    <div class="comments" id="gitalk-container"></div>
 
 <script>
   window.addEventListener('tabs:register', () => {
@@ -439,6 +440,26 @@ if (document.querySelectorAll('pre.mermaid').length) {
   
 
   
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '4e08ebd1f034b2b45c2a',
+      clientSecret: '9d7ab5a16970e4c63a19635e9de3f69b75268d6e',
+      repo        : 'Gitalk',
+      owner       : 'shadylyf321',
+      admin       : ['shadylyf321'],
+      id          : 'e33163bab73e51f9ccca683c7496a0cf',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
 
 </body>
 </html>
