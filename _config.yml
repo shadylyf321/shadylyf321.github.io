@@ -5,15 +5,27 @@
 # Site
 title: ShadyLYF
 subtitle: Keep Dreaming
-description: Game developer
+description: 游戏开发技术专栏
 keywords:
 author: ShadyLYF
 language: zh-CN
 timezone: ''
 
+##自动生成sitemap
+sitemap:
+  path: sitemap.xml
+
+# Social links
+social:
+  Email: mailto:for-spam@gmail.com
+
+social_icons:
+  enable: true
+  Email: envelope
+
 # URL
 ## If your site is put in a subdirectory, set url as 'http://yoursite.com/child' and root as '/child/'
-url: http://yoursite.com
+url: https://shadylyf321.github.io
 root: /
 permalink: :year/:month/:day/:title/
 permalink_defaults:
