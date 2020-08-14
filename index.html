@@ -180,7 +180,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2020-08-14 11:47:20" itemprop="dateModified" datetime="2020-08-14T11:47:20+08:00">2020-08-14</time>
+                <time title="修改时间：2020-08-14 18:12:58" itemprop="dateModified" datetime="2020-08-14T18:12:58+08:00">2020-08-14</time>
               </span>
 
           
@@ -194,101 +194,15 @@
     <div class="post-body" itemprop="articleBody">
 
       
-          <h2><span id="protocol如何实现高效编码">Protocol如何实现高效编码</span></h2><p>&emsp;当看到proto协议的时候, 会觉得和struct和class的定义差不多.那么它是不是以一定的内存对齐原则,排列在stream里面的呢?但是如果int类型都是占4个字节的话,1和10000在stream中的长度都是一样的,岂不是很浪费, 都说使用protocol buffers可以节省内存,但具体是如何实现的呢? </p>
-<h3><span id="protocol不同类型编码方式介绍">Protocol不同类型编码方式介绍</span></h3><table>
-<thead>
-<tr>
-<th>类型id</th>
-<th>含义</th>
-<th>使用</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>0</td>
-<td>Varint</td>
-<td>int32,int64,uint32,uint64,sint32,sint64,bool,enum</td>
-</tr>
-<tr>
-<td>1</td>
-<td>64-bit</td>
-<td>fixed64, sfixed64, double</td>
-</tr>
-<tr>
-<td>2</td>
-<td>Length-delimited</td>
-<td>string,bytes,embedded messages, packed repeated fields</td>
-</tr>
-<tr>
-<td>3</td>
-<td>Start group</td>
-<td>groups(弃用)</td>
-</tr>
-<tr>
-<td>4</td>
-<td>End group</td>
-<td>groups(弃用)</td>
-</tr>
-<tr>
-<td>5</td>
-<td>32-bit</td>
-<td>fixed32, sfixed32, float</td>
-</tr>
-</tbody></table>
-<p>&emsp;解码器是如何知道即将解码的对象是什么类型的呢?<br>&emsp;protocol buffers的数据流中,数据是是以流的形式串连起来的,而每一个数据是由key(filed_number &lt;&lt; 3|wire_type)-value组成, 形式如下:<br>&emsp;key1-value1|key2-value2|——-|keyn-valuen|<br>&emsp;接下来优先看一下Varint这种可变长存储整形数据的类型.</p>
-<h4><span id="varint">Varint</span></h4><p>&emsp;我不知道其他人怎么翻译这个词, 从它的的作用来看的话它就是一类可变长的变量. 和内存对齐不同, 这种变量类型在protocol编码过程当中是可变长的,那么自然的1和10000的编码所占字节数也是不同的.<br>&emsp;Varint类型数据是由一连串单字节数据构成, 既然是一连串, 那么必然需要一个串联信息. protocol将8位数据分成了两部分:1是数据本身,占7位(取值范围0~127);2就是时候还有后续数据串联,占1位(0没有 1有). </p>
-<h5><span id="uint编码-1和10000">uint编码 1和10000</span></h5><h6><span id="1">1</span></h6><p>&emsp;对应的二进制为:0000 0001由于1个字节已经够了所有只占用1个自己</p>
-<h6><span id="10000">10000</span></h6><p>&emsp;先看10000原本的二进制编码为 0010 0111 0001 0000. 由于占用了两个字节, 也就是说第一个字节在解码的时候需要告诉解码器, 这个数据还需要有后续字节, 所有最终在protocol中的编码为:<br>11001110 00010000<br>1 100 1110  -&gt; 0 001 0000 -&gt; 10011100010000 = 10000<br>Ok现在我们发现1000和1占用空间并不一样了!</p>
-<h5><span id="int和sint的区别">int和sint的区别</span></h5><p>&emsp;google官网的解释是:sint和int类型在数值为负数时编码上有较大的差异；int将占用10个字节，而sint将使用更为高效的zigzag编码。</p>
-<blockquote>
-<p>there is an important difference between the signed int types (sint32 and sint64) and the “standard” int types (int32 and int64) when it comes to encoding negative numbers. If you use int32 or int64 as the type for a negative number, the resulting varint is always ten bytes long – it is, effectively, treated like a very large unsigned integer. If you use one of the signed types, the resulting varint uses ZigZag encoding, which is much more efficient.<br>&emsp;接下来就重点分析两个问题：int类型负值编码为什么始终会占用10个字节和ZigZag编码为何更加高效。</p>
-</blockquote>
-<h6><span id="int负数编码为何始终占用10个字节">int负数编码为何始终占用10个字节</span></h6><p>&emsp;下面看一下protocol int32编码c#源码：</p>
-<figure class="highlight c#"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"><span class="doctag">///</span> <span class="doctag">&lt;summary&gt;</span></span></span><br><span class="line"><span class="comment"><span class="doctag">///</span> Writes an int32 field value, without a tag, to the stream.</span></span><br><span class="line"><span class="comment"><span class="doctag">///</span> <span class="doctag">&lt;/summary&gt;</span></span></span><br><span class="line"><span class="comment"><span class="doctag">///</span> <span class="doctag">&lt;param name=&quot;value&quot;&gt;</span>The value to write<span class="doctag">&lt;/param&gt;</span></span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">WriteInt32</span>(<span class="params"><span class="keyword">int</span> <span class="keyword">value</span></span>)</span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (<span class="keyword">value</span> &gt;= <span class="number">0</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        WriteRawVarint32((<span class="keyword">uint</span>) <span class="keyword">value</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// Must sign-extend.</span></span><br><span class="line">        WriteRawVarint64((<span class="keyword">ulong</span>) <span class="keyword">value</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">internal</span> <span class="keyword">void</span> <span class="title">WriteRawVarint64</span>(<span class="params"><span class="keyword">ulong</span> <span class="keyword">value</span></span>)</span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">while</span> (<span class="keyword">value</span> &gt; <span class="number">127</span> &amp;&amp; position &lt; limit)</span><br><span class="line">    &#123;</span><br><span class="line">        buffer[position++] = (<span class="keyword">byte</span>) ((<span class="keyword">value</span> &amp; <span class="number">0x7F</span>) | <span class="number">0x80</span>);</span><br><span class="line">        <span class="keyword">value</span> &gt;&gt;= <span class="number">7</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">while</span> (<span class="keyword">value</span> &gt; <span class="number">127</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        WriteRawByte((<span class="keyword">byte</span>) ((<span class="keyword">value</span> &amp; <span class="number">0x7F</span>) | <span class="number">0x80</span>));</span><br><span class="line">        <span class="keyword">value</span> &gt;&gt;= <span class="number">7</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (position &lt; limit)</span><br><span class="line">    &#123;</span><br><span class="line">        buffer[position++] = (<span class="keyword">byte</span>) <span class="keyword">value</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">    &#123;</span><br><span class="line">        WriteRawByte((<span class="keyword">byte</span>) <span class="keyword">value</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>&emsp;可以看到int32在编码负数时，会将类型转为ulong(64位)，然后还是按照7位串联的方式进行编码。<br>所以负数最终会占用 math.ceil(64 / 7) = 10字节。</p>
-<h6><span id="sint之zigzag编码">sint之ZigZag编码</span></h6><p>&emsp;ZigZag编码是将负数重新映射到了正数范围,之后就可以继续按照7位串联的方式进行编码,下面就是ZIgZag编码的映射表:</p>
-<table>
-<thead>
-<tr>
-<th>原始数值</th>
-<th>映射后数值</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>0</td>
-<td>0</td>
-</tr>
-<tr>
-<td>-1</td>
-<td>1</td>
-</tr>
-<tr>
-<td>1</td>
-<td>2</td>
-</tr>
-<tr>
-<td>-2</td>
-<td>3</td>
-</tr>
-<tr>
-<td>2147483647</td>
-<td>4294967294</td>
-</tr>
-<tr>
-<td>-2147483648</td>
-<td>4294967295</td>
-</tr>
-<tr>
-<td>&emsp;在学习int和sint的编码区别之后, 现在sint负数编码高效的原因也就清除了~</td>
-<td></td>
-</tr>
-</tbody></table>
-<h4><span id="length-delimited">Length-delimited</span></h4><p>&emsp;对于Length-delimited类型字段需要一个额外参数来描述该字符串的长度, 该长度参数使用的varint类型的编码方式(7位串联）。<br>&emsp; key(file_number&lt;&lt;3 | wire_type) + varint_length + data_value</p>
-<h5><span id="string">string</span></h5><p>&emsp;下面就来看一个string类型的例子：</p>
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">message Test1 </span><br><span class="line">&#123;  </span><br><span class="line">     <span class="built_in">string</span> b = <span class="number">2</span>;</span><br><span class="line">&#125;</span><br><span class="line">test1.b = <span class="string">&quot;testing&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment">//编码：12 07 74 65 73 74 69 6e 67</span></span><br></pre></td></tr></table></figure>
-<p> key:12 = （0010 &lt;&lt; 3 | 0010） = 00010010<br> length = 7<br> value = 74 65 73 74 69 6e 67</p>
-<h5><span id="embedded-mesaages">embedded mesaages</span></h5><figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">message Test2</span><br><span class="line">&#123;  </span><br><span class="line">     int32 a = <span class="number">1</span>;</span><br><span class="line">&#125;</span><br><span class="line">test2.a = <span class="number">150</span></span><br><span class="line"><span class="comment">//编码：08 96 01</span></span><br><span class="line"></span><br><span class="line">message Test3 </span><br><span class="line">&#123;  </span><br><span class="line">    Test1 c = <span class="number">3</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">//编码：1a 03 08 96 01</span></span><br></pre></td></tr></table></figure>
-<p>&emsp;由此可见protocol buffer通过varint类型7位串联对数值编码，使得数值占用空间减少；使用key-value串联的形式使得数据排列更加紧凑。</p>
-
+          <h2 id="Protocol如何实现高效编码"><a href="#Protocol如何实现高效编码" class="headerlink" title="Protocol如何实现高效编码"></a>Protocol如何实现高效编码</h2><p>&emsp;当看到proto协议的时候, 会觉得和struct和class的定义差不多.那么它是不是以一定的内存对齐原则,排列在stream里面的呢?但是如果int类型都是占4个字节的话,1和10000在stream中的长度都是一样的,岂不是很浪费, 都说使用protocol buffers可以节省内存,但具体是如何实现的呢? </p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/03/14/Protocol-Buffers-Efficient-Encoding/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
