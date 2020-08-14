@@ -14,7 +14,7 @@ tags:
 &emsp;为什么说它是一个跨平台的框架呢？原因在于它是基于通用语言基础架构(**Common Language Infrastructure**, 简称**CLI**)实现的。
 &emsp;CLI的提出旨在统一不同的高级开发语言在不同平台直接执行方式的差异。 按照CLI的规定，用来描述可执行代码的是一种叫做**CIL**（**Common Intermediate Language**）的语言，这是一种介于高级语言和机器语言之间的中间语言。
  &emsp; 不同语言统一成CIL后，通过不同平台**CLR**(**Common Language Runtime**)翻译器机器指令，从而实现大一统。
-    
+<!-- more -->  
 ```mermaid
 graph TD
 
