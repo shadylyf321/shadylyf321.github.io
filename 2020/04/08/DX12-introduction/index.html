@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.0.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+  <meta name="google-site-verification" content="-_1Nd8nLHmrGhotT0MBaOBxo2kZU3MTeseIfiUEqU7I">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"shadylyf321.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="&amp;emsp; DX12和DX11相比有了很多的变化，最核心的便是拉近了开发者和硬件的距离，让开发者能够更接近底层。对于硬件的控制DX12更加直接，更加高效，也增加了更多了可能性（多线程渲染）；但与此同时与DX11相比开发者的额外工作量也增加了不少。下面是个人学习笔记的一些整理，希望和大家分享。 基础流程介绍&amp;emsp; 基础流程的学习主要参考了微软官方DX12编程指南中，创建基础的DX12组件（C">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DX12入门笔记">
+<meta property="og:url" content="https://shadylyf321.github.io/2020/04/08/DX12-introduction/index.html">
+<meta property="og:site_name" content="ShadyLYF">
+<meta property="og:description" content="&amp;emsp; DX12和DX11相比有了很多的变化，最核心的便是拉近了开发者和硬件的距离，让开发者能够更接近底层。对于硬件的控制DX12更加直接，更加高效，也增加了更多了可能性（多线程渲染）；但与此同时与DX11相比开发者的额外工作量也增加了不少。下面是个人学习笔记的一些整理，希望和大家分享。 基础流程介绍&amp;emsp; 基础流程的学习主要参考了微软官方DX12编程指南中，创建基础的DX12组件（C">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://shadylyf321.github.io/images/DX12-introduction/1.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/DX12-introduction/2.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/DX12-introduction/3.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/DX12-introduction/4.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/DX12-introduction/5.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/DX12-introduction/6.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/DX12-introduction/7.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/DX12-introduction/8.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/DX12-introduction/9.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/DX12-introduction/10.png">
+<meta property="article:published_time" content="2020-04-08T14:18:50.000Z">
+<meta property="article:modified_time" content="2020-08-31T06:12:55.317Z">
+<meta property="article:author" content="ShadyLYF">
+<meta property="article:tag" content="DX12">
+<meta property="article:tag" content="GPU">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://shadylyf321.github.io/images/DX12-introduction/1.png">
+
+<link rel="canonical" href="https://shadylyf321.github.io/2020/04/08/DX12-introduction/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>DX12入门笔记 | ShadyLYF</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">ShadyLYF</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Keep Dreaming</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://shadylyf321.github.io/2020/04/08/DX12-introduction/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="ShadyLYF">
+      <meta itemprop="description" content="游戏开发技术专栏">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="ShadyLYF">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          DX12入门笔记
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-04-08 22:18:50" itemprop="dateCreated datePublished" datetime="2020-04-08T22:18:50+08:00">2020-04-08</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-08-31 14:12:55" itemprop="dateModified" datetime="2020-08-31T14:12:55+08:00">2020-08-31</time>
+              </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <p>&emsp; DX12和DX11相比有了很多的变化，最核心的便是拉近了开发者和硬件的距离，让开发者能够更接近底层。对于硬件的控制DX12更加直接，更加高效，也增加了更多了可能性（多线程渲染）；但与此同时与DX11相比开发者的额外工作量也增加了不少。下面是个人学习笔记的一些整理，希望和大家分享。</p>
+<h3><span id="基础流程介绍">基础流程介绍</span></h3><p>&emsp; 基础流程的学习主要参考了微软官方DX12编程指南中，创建基础的DX12组件（<a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/windows/win32/direct3d12/creating-a-basic-direct3d-12-component#code-example-for-a-simple-app">Creating a basic Direct3D 12 component</a>))这一章节。<br><img src="/images/DX12-introduction/1.png"><br>&emsp; 可以看到DX12是通过commandList将渲染指令提交给GPU的，此时cpu和gpu是异步执行的，而他们之前的同步是通过fence实现的。<a id="more"></a> 这也是DX12实现多线程渲染的核心，下面我们看一下WaitFirPreviousFrame这个方法的内容。<br><img src="/images/DX12-introduction/2.png"><br>&emsp; WaitForSingleObject方法会将当前线程挂起，当GPU功能完成时，触发handle信号改变，cpu继续执行。</p>
+<h3><span id="资源描述">资源描述</span></h3><h4><span id="descriptor">Descriptor</span></h4><p>&emsp; 顾名思义是一种描述。是什么的描述呢?各种用于渲染的资源(贴图/模型/参数…)，描述对象是谁呢?GPU。<br>&emsp; descriptor handle(GPU/CPU)，这是一个让我比较疑惑的东西。目前我是这样理解的：同一个descriptor当你需要在CPU使用时则使用CPU handle，当需要在GPU使用时则使用GPU handle。<br>&emsp; 以下是所有descriptor类型:<br><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/windows/win32/direct3d12/creating-descriptors#index-buffer-view">Index Buffer View</a><br><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/windows/win32/direct3d12/creating-descriptors#vertex-buffer-view">Vertex Buffer View</a><br><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/windows/win32/direct3d12/creating-descriptors#shader-resource-view">Shader Resource View</a><br><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/windows/win32/direct3d12/creating-descriptors#constant-buffer-view">Constant Buffer View</a><br><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/windows/win32/direct3d12/creating-descriptors#sampler">Sampler</a><br><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/windows/win32/direct3d12/creating-descriptors#unordered-access-view">Unordered Access View</a><br><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/windows/win32/direct3d12/creating-descriptors#stream-output-view">Stream output View</a><br><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/windows/win32/direct3d12/creating-descriptors#render-target-view">Render Target View</a><br><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/windows/win32/direct3d12/creating-descriptors#depth-stencil-view">Depth Stencil View</a></p>
+<h4><span id="descriptor-heap">Descriptor Heap</span></h4><p>&emsp; 多个同类型的descriptor的集合。这里所说发类型主要分为两个类型Shader Visible和No Shader Visible。<br>&emsp; Shader Visible主要包括：Shader Resource View/Constant Buffer View/Unorder Access View,指的是可以通过descriptorTable传入shader中使用的资源类型，如下图所示（注：Shader Visible类型的Heap也可以通过设置属性变成No Shader Visible）<br><img src="/images/DX12-introduction/3.png"><br>&emsp; No Shader Visible主要包括Render Target View/Depth Stencil View/Stream Output View,以上类型直接通过参数传递给ComandList使用。<br>&emsp; 我们发现Index Buffer View和Vertex Buffer View没有包含在上述两种类型中，他们是通过特定API传递的。<br><img src="/images/DX12-introduction/4.png"></p>
+<h4><span id="descriptor-table">Descriptor Table</span></h4><p>&emsp; 用于存放多个的Descriptor(这里指的是shader-visible类型的,cbv/srv/uav/sampler) ,然后通过rootSignature在同步,shader就可以使用以上的descriptor中的资源.<br>&emsp; 它并不是descriptor实际内存的集合, 而是给出对应Descriptor heap上的集合描述参数。引用官方说明来解释这个一点:</p>
+<blockquote>
+<p>Since memory allocation is a property of a creating a descriptor heap, defining a descriptor table out of one is guaranteed to be as cheap as identifying a region in the heap to the hardware.</p>
+</blockquote>
+<h3><span id="rootsignature">RootSignature</span></h3><p>&emsp; 它是一份通过commandList提供给shader使用的资源清单;这份清单有3种类型的参数：<br>&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;  常量(inlined)<br>&emsp;&emsp;&emsp;&emsp;&emsp;&emsp; descriptor(inlined)<br>&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;  descriptor table(和descriptor heap关联)<br>&emsp; 下图则是官方说明的一份清单:<br><img src="/images/DX12-introduction/5.png"></p>
+<h3><span id="资源绑定流程梳理">资源绑定流程梳理</span></h3><p>&emsp; 虽然上一篇有一个简单的流程图,但主要的目的是为了理解fence在dx12里的运用。接着本节并加入运用rootSignature绑定shader可见资源相关内容。为了深入理解之前总结的descriptor以及descriptor heap等概念，我们继续基于本节内容梳理一个资源绑定的流程。<br><img src="/images/DX12-introduction/6.png"><br>上述流程主要参考了<a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/windows/win32/direct3d12/resource-binding-flow-of-control">微软官方资源绑定流程</a>和陈文礼大佬的<a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/28981044">从零开始手写次世代引擎系列第十六章</a>。</p>
+<h3><span id="遇到的问题归纳">遇到的问题归纳</span></h3><p>&emsp; 接下来对descriptor创建过程中遇到的一些问题和一些细节探究做一个简单的归纳。<br>&emsp; <strong>最初我脑海里会有这样的疑问:dx12如何把CPU内存资源放到GPU内存, GPU内存需要什么申请,放在哪里合适？</strong> 通过阅读descriptor创建部分的代码, 以及一些相关资料的查阅和分析后，以上疑问得到了部分答案，也帮助我更好的理解的dx12资源绑定过程。<br>&emsp; 通过调用CreateCommittedResource方法可以创建一种叫Heap的资源，我把这种资源理解为实际物理内存。在从零手写次世代引擎16源代码中出现的两种类型的Heap资源, 下面就是这两种类型的<a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/windows/win32/api/d3d12/ne-d3d12-d3d12_heap_type">官方介绍</a>:</p>
+<ul>
+<li><strong>D3D12_HEAP_TYPE_DEFAULT (GPU内存)</strong><blockquote>
+<p>&emsp; This heap type experiences the most bandwidth for the GPU, but cannot provide CPU access.<br>&emsp; The GPU can read and write to the memory from this pool, and resource transition barriers may be changed.<br>&emsp; The majority of heaps and resources are expected to be located here, and are typically populated through resources in upload.</p>
+</blockquote>
+</li>
+<li><strong>D3D12_HEAP_TYPE_UPLOAD(CPU/GPU共享内存(个人理解),方便CPU写入/GPU读取的内存)</strong><blockquote>
+<p>&emsp; Pecifies a heap used for uploading.<br>This heap type has CPU access optimized for uploading to the GPU, but does not experience the maximum amount of bandwidth for the GPU.<br>&emsp; This heap type is best for CPU-write-once, GPU-read-once data; but GPU-read-once is stricter than necessary.<br>&emsp; GPU-read-once-or-from-cache is an acceptable use-case for the data; but such usages are hard to judge due to differing GPU cache designs and sizes.<br>&emsp; <strong>VertexData的descriptor的创建过程:</strong><br><img src="/images/DX12-introduction/7.png"><br>&emsp; 关于D3D_SUBRESOURCE_DESC有两个属性<strong>RowPitch和SlicePitch的使用一直不太理解</strong>。是因为从零手写次世代引擎16源代码在定义TextureData和indexData时:<br>indexData.RowPitch == SlicePitch == Stride(结构体位数)<br>textureData.RowPitch = width * Stride<br>textureData.SlicePitch = height * RowPitch(total Size)<br>&emsp; 为了了解一下原因，就进一步进入了UpdateSubresource方法内,查看RowPich和SlicePitch是如何使用的。<br>&emsp; 回到上面的流程图我们发现UpdateSubresource做了两件事情 <strong>1:subResourceData-&gt;uploadHeap 2:uploadHeap-&gt;gpu</strong>，其中第二步是通过CommandList提供的CopyBufferRegion/CopyTextureRegion方法实现，目前并不知道GPU层面实现细节，而第一步则是cpu内存copy的操作，能看到源代码，那就看看RowPitch和SlicePitch在内存copy(subResourceData-&gt;uploadHeap)过程到底是如何使用的。<br><img src="/images/DX12-introduction/8.png"><br>D3D12_MEMCPY_DEST.RowPitch = D3D_SUBRESOURCE_FOOTPRINT.RowPitch<br>D3D12_MEMCPY_DEST.SlicePitch = D3D_SUBRESOURCE_FOOTPRINT.RowPitch * RowNum (总大小)<br>&emsp; 可以看到pSrc的RowPitch和SlicePitch需要和pDest也就是uploadHeap的RowPitch和SlicePitch对应(除非NumSlices(depth) = 1, NumRows = 1 正好对应了VertexData和IndexData的情况, 他们的数据是一维排列的, 因此只要数据总长(RowSizeInBytes)正确就能保证正确copy).<br>&emsp; uploadHeap的RowPitch和SlicePitch的值是如何得到的呢?下面就需要介绍GetCopyableFootprints方法,该方法则会告诉你与D3D_RESOURCE_DESC对应的资源在UploadHeap中是如何排列的。它会计算记得出4个参数:pLayouts, pNumRows, pRowSizeInBytes,pTotalBytes.<br>通过这几个参数我们就能得知uploadHeap的排列方式<br>其中pLayouts的结构如下:<br><img src="/images/DX12-introduction/9.png"><br><img src="/images/DX12-introduction/10.png"><br>&emsp; 查看不同类型数据的layout可以发现, Texture2D是2维的，而buffer则是一维的。对于一维的buffer而言width自然是数据总长度(format未定义时,宽高的单位是byte), RowPicth为什么不等于Width呢, 查看官方说明是因为对齐方式是256(103168 = (102960 / 256 + 1) * 256)。<br>&emsp; 再看Texture2D，宽带为512，formant为4bytes所以RowPich = 512 * 4 (正好是256的整数倍),其中depth应该是相对mipLevels而言(ps:可以看到就算mipmap比原图小, 但内存占用却是一样)，此如何设置subResource的RowPitch和SlicePitch暂时可以有个答案了。<br>&emsp; 最后还有一个比较重要的方法就是<strong>ResourceBarrier</strong>。字面意思就是资源屏障，这个屏障是加的GPU的，主要目的是为了保护一块正在写入的资源内存，防止GPU对其执行其他的行为。这里有一篇对这个概念讲的比较详细的文章推荐给大家<a target="_blank" rel="noopener" href="https://devblogs.microsoft.com/directx/a-look-inside-d3d12-resource-state-barriers/">A Look Inside D3D12 Resouce State Barriers</a>。<br>&emsp; 以上就是个人学习笔记的总结和归纳，比较浅显。而且都是查阅资料加上个人理解，如果有不对的地方还希望大家能够指出，感谢！。</p>
+</blockquote>
+</li>
+</ul>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/DX12/" rel="tag"># DX12</a>
+              <a href="/tags/GPU/" rel="tag"># GPU</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/03/14/Protocol-Buffers-Efficient-Encoding/" rel="prev" title="Protocol Buffers Efficient Encoding">
+      <i class="fa fa-chevron-left"></i> Protocol Buffers Efficient Encoding
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link"><span class="nav-number">1.</span> <span class="nav-text">基础流程介绍</span></a></li><li class="nav-item nav-level-3"><a class="nav-link"><span class="nav-number">2.</span> <span class="nav-text">资源描述</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link"><span class="nav-number">2.1.</span> <span class="nav-text">Descriptor</span></a></li><li class="nav-item nav-level-4"><a class="nav-link"><span class="nav-number">2.2.</span> <span class="nav-text">Descriptor Heap</span></a></li><li class="nav-item nav-level-4"><a class="nav-link"><span class="nav-number">2.3.</span> <span class="nav-text">Descriptor Table</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link"><span class="nav-number">3.</span> <span class="nav-text">RootSignature</span></a></li><li class="nav-item nav-level-3"><a class="nav-link"><span class="nav-number">4.</span> <span class="nav-text">资源绑定流程梳理</span></a></li><li class="nav-item nav-level-3"><a class="nav-link"><span class="nav-number">5.</span> <span class="nav-text">遇到的问题归纳</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">ShadyLYF</p>
+  <div class="site-description" itemprop="description">游戏开发技术专栏</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">3</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+        <span class="site-state-item-count">6</span>
+        <span class="site-state-item-name">标签</span>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/shadylyf321" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;shadylyf321" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:shady_lyf321@163.com" title="E-Mail → mailto:shady_lyf321@163.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+
+  <script src='https://unpkg.com/mermaid@7.1.2/dist/mermaid.min.js'></script>
+  <script>
+    if (window.mermaid) {
+      mermaid.initialize({theme: 'forest'});
+    }
+  </script>
+
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">ShadyLYF</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script>
+if (document.querySelectorAll('pre.mermaid').length) {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/mermaid@8/dist/mermaid.min.js', () => {
+    mermaid.initialize({
+      theme    : '',
+      logLevel : 3,
+      flowchart: { curve     : 'linear' },
+      gantt    : { axisFormat: '%m/%d/%Y' },
+      sequence : { actorMargin: 50 }
+    });
+  }, window.mermaid);
+}
+</script>
+
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '4e08ebd1f034b2b45c2a',
+      clientSecret: '9d7ab5a16970e4c63a19635e9de3f69b75268d6e',
+      repo        : 'Gitalk',
+      owner       : 'shadylyf321',
+      admin       : ['shadylyf321'],
+      id          : 'a231b78e1d2040e8d15ca72c83509a36',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+</body>
+</html>
