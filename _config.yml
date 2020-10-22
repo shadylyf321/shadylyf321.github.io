@@ -4,8 +4,8 @@
 
 # Site
 title: ShadyLYF
-subtitle: Keep Dreaming
-description: 游戏开发技术专栏
+subtitle: Keep Thinking
+description: 游戏开发相关技术shady_lyf321@163.com
 keywords:
 author: ShadyLYF
 language: zh-CN
@@ -17,7 +17,7 @@ sitemap:
 
 # Social links
 social:
-  Email: mailto:for-spam@gmail.com
+  Email: shadyyl321@gmail.com
 
 social_icons:
   enable: true
