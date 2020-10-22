@@ -149,6 +149,78 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://shadylyf321.github.io/2020/10/02/Mono-SGen/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="ShadyLYF">
+      <meta itemprop="description" content="游戏开发技术专栏">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="ShadyLYF">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2020/10/02/Mono-SGen/" class="post-title-link" itemprop="url">Mono SGen</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-10-02 14:04:10" itemprop="dateCreated datePublished" datetime="2020-10-02T14:04:10+08:00">2020-10-02</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-10-22 14:33:53" itemprop="dateModified" datetime="2020-10-22T14:33:53+08:00">2020-10-22</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="Mono内存管理之SGen"><a href="#Mono内存管理之SGen" class="headerlink" title="Mono内存管理之SGen"></a>Mono内存管理之SGen</h2><p>&emsp; 在使用c#进行Unity开发时, 构建一个对象只需要New对象构造函数()，我们并不知道如何回收该对象。那么就有一个问题: <strong>该对象在创建时，其内存是如何分配的；以及何时对该对象进行回收，如何回收其对应内存？</strong> 由于c#并没有提供直接可操作内存的方法（unsafe除外，一般不会使用），所以上面的问题都交给了一个叫做<strong>垃圾回收器</strong>的东西，它既为创建对象分配内存，又回收对象内存。在Mono中使用的垃圾回收器为<strong>SGen</strong>, 这是一款专门为Mono设计的垃圾回收器，下面就来初步认识一下SGen。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2020/10/02/Mono-SGen/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="https://shadylyf321.github.io/2020/04/08/DX12-introduction/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -428,12 +500,12 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">3</span>
+          <span class="site-state-item-count">4</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
-        <span class="site-state-item-count">6</span>
+        <span class="site-state-item-count">7</span>
         <span class="site-state-item-name">标签</span>
       </div>
   </nav>

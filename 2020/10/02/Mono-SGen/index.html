@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.0.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+  <meta name="google-site-verification" content="-_1Nd8nLHmrGhotT0MBaOBxo2kZU3MTeseIfiUEqU7I">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"shadylyf321.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="Mono内存管理之SGen&amp;emsp; 在使用c#进行Unity开发时, 构建一个对象只需要New对象构造函数()，我们并不知道如何回收该对象。那么就有一个问题: 该对象在创建时，其内存是如何分配的；以及何时对该对象进行回收，如何回收其对应内存？ 由于c#并没有提供直接可操作内存的方法（unsafe除外，一般不会使用），所以上面的问题都交给了一个叫做垃圾回收器的东西，它既为创建对象分配内存，又回收">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Mono SGen">
+<meta property="og:url" content="https://shadylyf321.github.io/2020/10/02/Mono-SGen/index.html">
+<meta property="og:site_name" content="ShadyLYF">
+<meta property="og:description" content="Mono内存管理之SGen&amp;emsp; 在使用c#进行Unity开发时, 构建一个对象只需要New对象构造函数()，我们并不知道如何回收该对象。那么就有一个问题: 该对象在创建时，其内存是如何分配的；以及何时对该对象进行回收，如何回收其对应内存？ 由于c#并没有提供直接可操作内存的方法（unsafe除外，一般不会使用），所以上面的问题都交给了一个叫做垃圾回收器的东西，它既为创建对象分配内存，又回收">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://shadylyf321.github.io/images/Mono-SGen/1.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/Mono-SGen/2.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/Mono-SGen/3.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/Mono-SGen/4.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/Mono-SGen/5.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/Mono-SGen/6.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/Mono-SGen/7.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/Mono-SGen/8.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/Mono-SGen/10.png">
+<meta property="article:published_time" content="2020-10-02T06:04:10.000Z">
+<meta property="article:modified_time" content="2020-10-22T06:33:53.172Z">
+<meta property="article:author" content="ShadyLYF">
+<meta property="article:tag" content="Mono">
+<meta property="article:tag" content="GC">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://shadylyf321.github.io/images/Mono-SGen/1.png">
+
+<link rel="canonical" href="https://shadylyf321.github.io/2020/10/02/Mono-SGen/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Mono SGen | ShadyLYF</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">ShadyLYF</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Keep Dreaming</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://shadylyf321.github.io/2020/10/02/Mono-SGen/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="ShadyLYF">
+      <meta itemprop="description" content="游戏开发技术专栏">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="ShadyLYF">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Mono SGen
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-10-02 14:04:10" itemprop="dateCreated datePublished" datetime="2020-10-02T14:04:10+08:00">2020-10-02</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-10-22 14:33:53" itemprop="dateModified" datetime="2020-10-22T14:33:53+08:00">2020-10-22</time>
+              </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2><span id="mono内存管理之sgen">Mono内存管理之SGen</span></h2><p>&emsp; 在使用c#进行Unity开发时, 构建一个对象只需要New对象构造函数()，我们并不知道如何回收该对象。那么就有一个问题: <strong>该对象在创建时，其内存是如何分配的；以及何时对该对象进行回收，如何回收其对应内存？</strong> 由于c#并没有提供直接可操作内存的方法（unsafe除外，一般不会使用），所以上面的问题都交给了一个叫做<strong>垃圾回收器</strong>的东西，它既为创建对象分配内存，又回收对象内存。在Mono中使用的垃圾回收器为<strong>SGen</strong>, 这是一款专门为Mono设计的垃圾回收器，下面就来初步认识一下SGen。</p>
+<a id="more"></a>
+<p>&emsp; SGen的内存托管堆由三个部分构成：<strong>Nursery, Major Heap, Large Object Space</strong>。<br><img src="/images/Mono-SGen/1.png"></p>
+<p>&emsp; <strong>Nursery</strong>：又称为Young Generation, 主要用来创建内存较小并且生命周期较短的一些对象，该托管堆是使用的是比较常见的<strong>Semi-Copying Collector</strong>进行内存回收。Nursery托管堆默认大小为4M，当Nursery占用比例达到一定阈值后， SGen会将Nursery中的对象移动到<strong>Major Heap</strong>，并清空Nursery。<br><img src="/images/Mono-SGen/2.png"><br>&emsp; <strong>Major Heap</strong>：又称为Old Generation, 顾名思义存放的都是一些‘老顽固’，SGen提供了两种垃圾回收器给Major Heap，分别是<strong>Copying Collector</strong>和<strong>Mark and Sweep Collector</strong>默认使用Mark and Sweep Collector 。<br>&emsp; <strong>large Object Space</strong>： SGen默认大于8000bytes的对象称之为Large Object，它在创建时直接的向操作系统申请内存，回收时也是及时将内存还给系统。</p>
+<h3><span id="nursery">Nursery</span></h3><p>&emsp; Nursery作为生命周期较短的对象产生和回收地，随着对象的回收内存中会产生大量的大小不确定内存碎片，分散在Nursery中，导致内存不能合理的利用。<br>&emsp; 我们来看一个产生内存碎片的过程：<br>1）创建一个长度为4096字节的对象a;<br>2) 创建一个长度为1024字节的对象b;<br>3) 创建一个长度为1024字节的对象c;<br>4) 回收对象a;<br>5) 创建一个长度为1024字节的对象d;<br>6) 回收c;<br>7) 创建一个长度为4096的对象e;<br><img src="/images/Mono-SGen/3.png"><br>&emsp; 基于Nursery的特性，SGen为它提供了一种名为Copying Collector的垃圾回收算法解决上述问题。</p>
+<h4><span id="semi-spacecopying-collector">Semi-Space/Copying Collector</span></h4><p>&emsp; Copying  Collector又称为Semi-Space Collector是因为：它将内存对半分，回收的时候遍历root表查找到还存在引用的对象，然后将他们复制到内存另外一半空间，并整齐的排列，同时清除内存的另外一半空间 。这样我们发现经过复制操作后，成功的消除了内存中的碎片。下面通过一个例子来理解一下复制这个过程：<br>&emsp; 首先创建了Obj1-5，共5个对象；<br><img src="/images/Mono-SGen/4.png"><br>&emsp; GC时Obj2和Obj4还存在引用，将他们复制到内存的另外一半，并整齐排列；<br><img src="/images/Mono-SGen/5.png"><br>&emsp; 清除内存另外一半，故 Obj1,Obj3和Obj5所占用的内存被回收；<br><img src="/images/Mono-SGen/6.png"><br>&emsp; 内存中又产生了两个新的对象Obj7和Obj8;<br><img src="/images/Mono-SGen/7.png"><br>&emsp; 再次GC将Obj4,Obj6和Obj8复制，并回收Obj2和Obj7；<br><img src="/images/Mono-SGen/8.png"><br>&esmp; 通过上述过程我们发现，内存碎片在复制的过程中就消失了。</p>
+<h4><span id="重定向forwarding">重定向forwarding</span></h4><p>&emsp; 我们知道当Nursery中的对象所占用内存到一定程度后，SGen回将Nursery中的存在引用的对象copy到Major Heap当中。所以copy不仅在copying collector中要用到，在对象copy到Major Heap时也需要，并且完成copy后的对象需要进行地址的重定向。<br>&emsp; 通过广度优先遍历root表，将存在引用的对象存放的栈中（存在重复对象），然后依次将进行copy操作，那么如何知道一个对象是否已经完成copy？针对上述问题SGen将对象地址最后一位用来标记对象是否已经完成重定向。<br>&emsp; 下面的伪代码用来描述copy到Major Heap的过程：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">while</span> (!gray_stack_is_empty ()) &#123;</span><br><span class="line">    object = gray_stack_pop ();</span><br><span class="line">    foreach (refp in object) &#123;</span><br><span class="line">        old = *refp;</span><br><span class="line">        <span class="keyword">if</span> (!ptr_in_nursery (old))</span><br><span class="line">            <span class="keyword">continue</span>;</span><br><span class="line">        <span class="keyword">if</span> (object_is_forwarded (old)) &#123;</span><br><span class="line">            <span class="keyword">new</span> = forwarding_destination (old);</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">             <span class="keyword">new</span> = major_alloc (object_size (old));</span><br><span class="line">             copy_object (<span class="keyword">new</span>, old);</span><br><span class="line">             forwarding_set (old, <span class="keyword">new</span>);</span><br><span class="line">             gray_stack_push (<span class="keyword">new</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        *refp = <span class="keyword">new</span>;</span><br><span class="line">    &#125;</span><br><span class="line"> &#125;</span><br></pre></td></tr></table></figure>
+
+<h3><span id="major-heap">Major Heap</span></h3><p>&emsp; 通过对Nursery的学习可以发现，Nursery中回频繁触发copy的操作，对象生命周期较短的对象可以达到回收的目的。但是对象生命周期较长的对象来说，copy操作就显得无用，而且浪费性能，所以SGen将他们移动到了Major Heap。<br>&emsp; Mark-Sweep过程伪代码</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//BFS（广度优先遍历）</span></span><br><span class="line">```</span><br><span class="line">mark():</span><br><span class="line">    <span class="keyword">while</span> !isEmpty(worklist):</span><br><span class="line">        ref = <span class="built_in">remove</span>(worklist)</span><br><span class="line">        <span class="keyword">for</span> each field in Pointers(ref)  </span><br><span class="line">            child = *field</span><br><span class="line">            <span class="keyword">if</span> child != null &amp;&amp; !isMarked(child)</span><br><span class="line">                setMarked(child)</span><br><span class="line">                add(worklist, child)</span><br><span class="line">                </span><br><span class="line">sweep(start, <span class="built_in">end</span>):</span><br><span class="line">    scan = start</span><br><span class="line">    <span class="keyword">while</span> scan &lt; <span class="built_in">end</span></span><br><span class="line">        <span class="keyword">if</span> isMarked(scan)</span><br><span class="line">            unsetMarked(scan)</span><br><span class="line">        <span class="keyword">else</span></span><br><span class="line">            <span class="built_in">free</span>(scan)</span><br><span class="line">        scan = nextObject(scan)</span><br></pre></td></tr></table></figure>
+<h4><span id="sweep-mark">sweep-mark</span></h4><p>&emsp; Major Heap新推出的垃圾回收算法叫作Mark-Sweep(标记清除），和Copying Collector不同的是此算法不会将对象在内存中移动。简单来说就是：先扫描Heap，标记出有引用对象，然后执行Sweep回收没有引用的对象。接下来我们来看一下它是如何标记内存对象，以Mark-Sweep是如何避免内存碎片的产生？</p>
+<h4><span id="block">block</span></h4><p>&emsp; Mark-Sweep将内存划分为固定大小的Block，并且每一个Block内放的对象的大小都是相同的。这样一来就算对象被回收留下了空位，空位的大小也正好可以分配给一个新的对象。当然对象有各种各种各样的大小，所以SGen需要提前针对不同大小的对象生成Block。<br>&emsp; Block内存维护了一个freelist，这样的在分配内存的时候就快速从freelist中获取，而省去了搜索的过程。<br>&emsp; 由于Block内对象都是以内存对齐的方式排列，因此可以使用bitmap用来标记对象。例如一个大小位65535字节的block，对象以16字节对齐，那么block中就有4096个内存空间，对应4096个bit=512个字节。通过block开始地址和bitmap可以很方便的计算出对象的内存地址，并且bitmap结构紧凑，可以一次性加载到内存，提升了内存的局域性。<br>&emsp; 下面给出使用bitmap进行mark过程的伪代码：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">mark():</span><br><span class="line">    cur = nextInBitmap()</span><br><span class="line">    <span class="keyword">while</span> cur &lt; heapEnd</span><br><span class="line">        add(worklist, cur)</span><br><span class="line">        markStep(cur)</span><br><span class="line">        cur = nextInBitmap()</span><br><span class="line">      </span><br><span class="line">markStep(start):</span><br><span class="line">    <span class="keyword">while</span> !isEmpty():</span><br><span class="line">        ref = <span class="built_in">remove</span>(worklist)</span><br><span class="line">        <span class="keyword">for</span> each field in Pointers(ref):</span><br><span class="line">            child = *field</span><br><span class="line">            <span class="keyword">if</span> child != null &amp;&amp; !isMarked(child)</span><br><span class="line">                setMarked(child)</span><br><span class="line">                <span class="keyword">if</span> child &gt; start </span><br><span class="line">                    add(worklist, child)</span><br></pre></td></tr></table></figure>
+<p>&emsp; 同样的用来描述Block的BlockInfo数据结构也是顺序的排列，这样就不需要加载对应的Block，而只需要通过block的index去BlockInfo的队伍中去获取。</p>
+<h4><span id="fixed-heap">fixed heap</span></h4><p>&emsp; 当我们在向系统申请内存时，系统会block当前线程，然后去内核获取，然后完成内存分配恢复对应线程。这是一个很复制的过程，对于游戏引擎来说，需要时再获取会相当耗费性能，可能会导致卡顿。因此SGen会在程序启动时提前申请一块较大的堆内存用域存放Block。<br>&emsp; 并且当堆内存不够用是，SGen又会向系统再申请一块固定大小的堆内存，这样的设计有一个不好的点就是可能会导致其内存使用率不高。</p>
+<h3><span id="增量gc">增量GC</span></h3><p>&emsp; 传统的GC过程都会导致一个问题：stop-the-world，意思就是在引用分析和清除阶段需要挂起程序，直到这一次GC结束然后恢复程序。STW对于游戏引擎来说最致命就是会导致卡顿。随之Unity2019.1推出了最新的增量式GC，大大的缓解了上述问题。<br><img src="/images/Mono-SGen/10.png"><br>&emsp; 从上图可以看出，增量式(incremental)GC实际上是将单次MS过程分成了多个小批次，从而导致程序停顿很小，达到近似实时的效果。<br>&emsp; 实现增量式GC的核心是在之前的算法基础上引入了<strong>三色标记</strong>算法，有兴趣的同学可以研究一下。<br>&emsp; 以上就是对Unity内存管理SGen的一个大概描述。也是自己学习过程中对资料的整理加上一些自己的理解，如果不对或不清楚的地方还希望大家能够指出，感谢!</p>
+<p><a target="_blank" rel="noopener" href="https://www.mono-project.com/docs/advanced/garbage-collector/sgen/">Mono SGen Doc</a><br><a target="_blank" rel="noopener" href="http://www.cs.cornell.edu/courses/cs312/2003fa/lectures/sec24.htm">Copying Carbage Collection</a><br><a target="_blank" rel="noopener" href="https://liujiacai.net/blog/2018/07/08/mark-sweep/">深入浅出垃圾回收（二）Mark-Sweep 详析及其优化</a><br><a target="_blank" rel="noopener" href="https://zhuanlan.zhihu.com/p/29023579">从零开始手敲次世代游戏引擎（十八）</a></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Mono/" rel="tag"># Mono</a>
+              <a href="/tags/GC/" rel="tag"># GC</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/04/08/DX12-introduction/" rel="prev" title="DX12入门笔记">
+      <i class="fa fa-chevron-left"></i> DX12入门笔记
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link"><span class="nav-number">1.</span> <span class="nav-text">Mono内存管理之SGen</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link"><span class="nav-number">1.1.</span> <span class="nav-text">Nursery</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link"><span class="nav-number">1.1.1.</span> <span class="nav-text">Semi-Space&#x2F;Copying Collector</span></a></li><li class="nav-item nav-level-4"><a class="nav-link"><span class="nav-number">1.1.2.</span> <span class="nav-text">重定向forwarding</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link"><span class="nav-number">1.2.</span> <span class="nav-text">Major Heap</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link"><span class="nav-number">1.2.1.</span> <span class="nav-text">sweep-mark</span></a></li><li class="nav-item nav-level-4"><a class="nav-link"><span class="nav-number">1.2.2.</span> <span class="nav-text">block</span></a></li><li class="nav-item nav-level-4"><a class="nav-link"><span class="nav-number">1.2.3.</span> <span class="nav-text">fixed heap</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link"><span class="nav-number">1.3.</span> <span class="nav-text">增量GC</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">ShadyLYF</p>
+  <div class="site-description" itemprop="description">游戏开发技术专栏</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">4</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+        <span class="site-state-item-count">7</span>
+        <span class="site-state-item-name">标签</span>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/shadylyf321" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;shadylyf321" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:shady_lyf321@163.com" title="E-Mail → mailto:shady_lyf321@163.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+
+  <script src='https://unpkg.com/mermaid@7.1.2/dist/mermaid.min.js'></script>
+  <script>
+    if (window.mermaid) {
+      mermaid.initialize({theme: 'forest'});
+    }
+  </script>
+
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">ShadyLYF</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script>
+if (document.querySelectorAll('pre.mermaid').length) {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/mermaid@8/dist/mermaid.min.js', () => {
+    mermaid.initialize({
+      theme    : '',
+      logLevel : 3,
+      flowchart: { curve     : 'linear' },
+      gantt    : { axisFormat: '%m/%d/%Y' },
+      sequence : { actorMargin: 50 }
+    });
+  }, window.mermaid);
+}
+</script>
+
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '4e08ebd1f034b2b45c2a',
+      clientSecret: '9d7ab5a16970e4c63a19635e9de3f69b75268d6e',
+      repo        : 'Gitalk',
+      owner       : 'shadylyf321',
+      admin       : ['shadylyf321'],
+      id          : '72b9b137fb0b4009a84fe19b2c888ba8',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+</body>
+</html>
