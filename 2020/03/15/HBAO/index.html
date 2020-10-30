@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.0.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+  <meta name="google-site-verification" content="-_1Nd8nLHmrGhotT0MBaOBxo2kZU3MTeseIfiUEqU7I">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"shadylyf321.github.io","root":"/","scheme":"Pisces","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="Horizon-Based Ambient Occlusion 算法说明&amp;emsp; Ambient Occlusion(漫反射遮罩)，是用来描述反射光线被周围物体遮挡的一种光照模型。先看下面的公式：是描述物体表面任一一点的遮罩情况：">
+<meta property="og:type" content="article">
+<meta property="og:title" content="浅谈HBAO">
+<meta property="og:url" content="https://shadylyf321.github.io/2020/03/15/HBAO/index.html">
+<meta property="og:site_name" content="ShadyLYF">
+<meta property="og:description" content="Horizon-Based Ambient Occlusion 算法说明&amp;emsp; Ambient Occlusion(漫反射遮罩)，是用来描述反射光线被周围物体遮挡的一种光照模型。先看下面的公式：是描述物体表面任一一点的遮罩情况：">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://shadylyf321.github.io/images/HBAO/1.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/HBAO/2.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/HBAO/3.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/HBAO/4.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/HBAO/5.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/HBAO/6.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/HBAO/7.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/HBAO/8.png">
+<meta property="og:image" content="https://shadylyf321.github.io/images/HBAO/9.png">
+<meta property="article:published_time" content="2020-03-15T13:18:50.000Z">
+<meta property="article:modified_time" content="2020-10-30T02:32:45.702Z">
+<meta property="article:author" content="ShadyLYF">
+<meta property="article:tag" content="Unity">
+<meta property="article:tag" content="HBAO">
+<meta property="article:tag" content="AO">
+<meta property="article:tag" content="PostProcess">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://shadylyf321.github.io/images/HBAO/1.png">
+
+<link rel="canonical" href="https://shadylyf321.github.io/2020/03/15/HBAO/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>浅谈HBAO | ShadyLYF</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">ShadyLYF</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">Keep Thinking</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://shadylyf321.github.io/2020/03/15/HBAO/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="ShadyLYF">
+      <meta itemprop="description" content="游戏开发相关技术shady_lyf321@163.com">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="ShadyLYF">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          浅谈HBAO
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2020-03-15 21:18:50" itemprop="dateCreated datePublished" datetime="2020-03-15T21:18:50+08:00">2020-03-15</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2020-10-30 10:32:45" itemprop="dateModified" datetime="2020-10-30T10:32:45+08:00">2020-10-30</time>
+              </span>
+
+          
+            <span class="post-meta-item" title="阅读次数" id="busuanzi_container_page_pv" style="display: none;">
+              <span class="post-meta-item-icon">
+                <i class="fa fa-eye"></i>
+              </span>
+              <span class="post-meta-item-text">阅读次数：</span>
+              <span id="busuanzi_value_page_pv"></span>
+            </span>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h3><span id="horizon-based-ambient-occlusion-算法说明">Horizon-Based Ambient Occlusion 算法说明</span></h3><p>&emsp; Ambient Occlusion(漫反射遮罩)，是用来描述反射光线被周围物体遮挡的一种光照模型。先看下面的公式：是描述物体表面任一一点的遮罩情况：<br><img src="/images/HBAO/1.png"></p>
+<a id="more"></a>
+<p>&emsp; 上式中V代表该某一特定方向上的遮挡情况，该点延w方向被遮挡时V=1，未被遮挡时V=0。W则是一个简单的线性衰减函数。<br>&emsp; 接下来进一步分析Horizon-Based Ambient Occlusion是如何计算遮挡的。<br><img src="/images/HBAO/2.png"><br>&emsp; 先看上图，其中弯曲的红线是p点半球面延某一特定方向t的切片上(半球上砍一刀的横截面)的高度场。<br>&emsp; 在切片范围内高度场的最大值点与P点连线方向(黄色)与方向t的夹角为h(θ);<br>&emsp; 垂直于视线平面(位于该平面上的范围才计算遮挡)与方向t的夹角为t(θ)。<br>&emsp; 近似上诉切片上被遮挡的值=cose(α)。在t(θ)~h(θ)这个范围对遮挡值求定积分，接着在整个半球范围对遮挡值积分，得到整个半球面的遮挡值。以上即使Horizontal-Based Ambient Occlusion算法的核心，公式如下。<br><img src="/images/HBAO/3.png"><br>&emsp; 上式中：<br>&emsp; <img src="/images/HBAO/4.png"><br>&emsp; 进一步简化正弦函数（Ps:GPU普通指令运算单元数量远多于三角函数这类复杂运算单元）</p>
+<p><img src="/images/HBAO/5.png"><br>&emsp; 通过上面的转换，将正弦函数转化为常用运算指令。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">inline</span> <span class="keyword">float</span> <span class="title">SimpleAO</span><span class="params">(float3 pos, float3 stepPos, float3 normal, inout <span class="keyword">float</span> top)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    float3 h = stepPos - pos;</span><br><span class="line">    <span class="keyword">float</span> dist = <span class="built_in">sqrt</span>(dot(h, h));</span><br><span class="line">    <span class="keyword">float</span> sinBlock = dot(normal, h) / dist;</span><br><span class="line">    <span class="keyword">float</span> diff = <span class="built_in">max</span>(sinBlock - top, <span class="number">0</span>);</span><br><span class="line">    top = <span class="built_in">max</span>(sinBlock, top);</span><br><span class="line">    <span class="keyword">return</span> saturate(diff) * saturate(FallOff(dist));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>&emsp; 以上则是AO近似计算的代码，sinBlock-top对应sin(h)-sin(t), Falloff(dist)是一个随距离线性衰减的函数对应W(w)部分。</p>
+<h3><span id="基于unity实现">基于Unity实现</span></h3><p>&emsp; HBAO是在后处理阶段，逐像素构建半球面。采用蒙特卡洛采样计算像素对应物体坐标点的AO值。下图是nvddia官方给出的HBAO实现流程。<br><img src="/images/HBAO/6.png"><br>&emsp; 根据算法介绍我们知道，需要重建对应点坐标和法线，计算AO再进行模糊处理，最终和原始图像合并得到最终效果。以下是HBAO基于u3d前向渲染的实现。</p>
+<h4><span id="屏幕空间坐标重建">屏幕空间坐标重建</span></h4><p>&emsp; 下图中θ为相机的fov, 均是分析对应p屏幕空间的y坐标（其中v0, v1, v2对应uv值中的v映射至-1~1）。</p>
+<p><img src="/images/HBAO/7.png"><br>&emsp; 对应代码如下：</p>
+<figure class="highlight c#"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">    <span class="keyword">var</span> tanHalfFovY = Mathf.Tan(mCamera.fieldOfView * <span class="number">0.5f</span> * Mathf.Deg2Rad);</span><br><span class="line"><span class="keyword">var</span> tanHalfFovX = tanHalfFovY * ((<span class="keyword">float</span>)mCamera.pixelWidth / mCamera.pixelHeight);</span><br><span class="line"></span><br><span class="line">    <span class="comment">//计算相机空间:x = (2* u - 1) * tanHalfFovX * depth  (2u - 1将坐标映射到-1,1)</span></span><br><span class="line">mMaterial.SetVector(ShaderProperties.UV2View, </span><br><span class="line">    <span class="keyword">new</span> Vector4(<span class="number">2</span> * tanHalfFovX, <span class="number">2</span> * tanHalfFovY, -tanHalfFovX, -tanHalfFovY));</span><br></pre></td></tr></table></figure>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">inline</span> float3 <span class="title">FetchViewPos</span><span class="params">(float2 uv)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">        <span class="keyword">float</span> depth = LinearEyeDepth(FetchDepth(uv));</span><br><span class="line">        <span class="keyword">return</span> float3((uv * _UV2View.xy + _UV2View.zw) * depth, depth);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4><span id="计算hbao">计算HBAO</span></h4><p>&emsp; 上面已经介绍了半球某一特定方向上切片遮挡的计算方法，接下来使用蒙特卡洛积分，采样半球不同方向上的切片的遮挡，模拟HBAO积分结果。<br>&emsp; 为了避免明显的交错感，每次采样时进行一次随机，让采样方向产生一点偏移。如下图所示：<br><img src="/images/HBAO/8.png"><br>&emsp; 随机算法采用了the book of shader 11中提到的value-nosie。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">inline</span> <span class="keyword">float</span> <span class="title">random</span><span class="params">(float2 uv)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> frac(<span class="built_in">sin</span>(dot(uv.xy, float2(<span class="number">12.9898</span>, <span class="number">78.233</span>))) * <span class="number">43758.5453123</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>&emsp; 下图时使用python matplotlib库生成的value-nosie的噪声图。<br><img src="/images/HBAO/9.png"></p>
+<p>&emsp; 以下则是使用蒙特卡洛方法计算HBAO的主要代码</p>
+<pre><code class="c++">    for (int i = 0; i &lt; DIRECTION; ++i)
+    &#123;
+        float angle = delta * (float(i) + rnd);
+        float cos, sin;
+        sincos(angle, sin, cos);
+        float2 dir = float2(cos, sin);
+        float rayPixel = 1;
+        float top = _AngleBias;
+        UNITY_UNROLL
+        for(int j = 0; j &lt; STEPS; ++j)
+        &#123;
+            float2 stepUV = round(rayPixel * dir) * _TexelSize.xy + input.uv;
+            float3 stepViewPos = FetchViewPos(stepUV);
+            ao += SimpleAO(viewPos, stepViewPos, normal, top);
+            rayPixel += stepSize;
+        &#125;
+    &#125;
+    ao /= STEPS * DIRECTION;</code></pre>
+<p>&emsp; 由于采样数量和高度场步进数有限，生成的AO图上会有一定交错感和噪点，使用模糊算法（本文代码分别使用了均值模糊和高斯模糊）对AO图像进行处理后，与原始图像叠加既可以得到最终效果。以上是个人学习过程中的总结，如果有问题还望看到的同学指出。<br>&emsp; 源代码：<a target="_blank" rel="noopener" href="https://github.com/shadylyf321/HBAO">https://github.com/shadylyf321/HBAO</a></p>
+<p>参考：<br><a target="_blank" rel="noopener" href="http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.214.6686&rep=rep1&type=pdf">Image-Space Horizon-Based Ambient Occlusion</a><br><a target="_blank" rel="noopener" href="https://www.derschmale.com/2013/12/20/an-alternative-implementation-for-hbao-2/">An alternative implementation for HBAO</a><br><a target="_blank" rel="noopener" href="https://docs.nvidia.com/gameworks/content/gameworkslibrary/visualfx/hbao/product.html">NVIDIA HBAO+ 2.4</a><br><a target="_blank" rel="noopener" href="https://thebookofshaders.com/11/">the book of shader 11</a></p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/Unity/" rel="tag"># Unity</a>
+              <a href="/tags/HBAO/" rel="tag"># HBAO</a>
+              <a href="/tags/AO/" rel="tag"># AO</a>
+              <a href="/tags/PostProcess/" rel="tag"># PostProcess</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/03/14/Protocol-Buffers-Efficient-Encoding/" rel="prev" title="Protocol Buffers Efficient Encoding">
+      <i class="fa fa-chevron-left"></i> Protocol Buffers Efficient Encoding
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2020/04/08/DX12-introduction/" rel="next" title="DX12入门笔记">
+      DX12入门笔记 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+    <div class="comments" id="gitalk-container"></div>
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link"><span class="nav-number">1.</span> <span class="nav-text">Horizon-Based Ambient Occlusion 算法说明</span></a></li><li class="nav-item nav-level-3"><a class="nav-link"><span class="nav-number">2.</span> <span class="nav-text">基于Unity实现</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link"><span class="nav-number">2.1.</span> <span class="nav-text">屏幕空间坐标重建</span></a></li><li class="nav-item nav-level-4"><a class="nav-link"><span class="nav-number">2.2.</span> <span class="nav-text">计算HBAO</span></a></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">ShadyLYF</p>
+  <div class="site-description" itemprop="description">游戏开发相关技术shady_lyf321@163.com</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">5</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">标签</span>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/shadylyf321" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;shadylyf321" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:shady_lyf321@163.com" title="E-Mail → mailto:shady_lyf321@163.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+
+  <script src='https://unpkg.com/mermaid@7.1.2/dist/mermaid.min.js'></script>
+  <script>
+    if (window.mermaid) {
+      mermaid.initialize({theme: 'forest'});
+    }
+  </script>
+
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">ShadyLYF</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://pisces.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Pisces</a> 强力驱动
+  </div>
+
+        
+<div class="busuanzi-count">
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <span class="post-meta-item" id="busuanzi_container_site_uv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="总访客量">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-divider">|</span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv" style="display: none;">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="总访问量">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script>
+if (document.querySelectorAll('pre.mermaid').length) {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/mermaid@8/dist/mermaid.min.js', () => {
+    mermaid.initialize({
+      theme    : '',
+      logLevel : 3,
+      flowchart: { curve     : 'linear' },
+      gantt    : { axisFormat: '%m/%d/%Y' },
+      sequence : { actorMargin: 50 }
+    });
+  }, window.mermaid);
+}
+</script>
+
+
+  
+
+  
+
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.css">
+
+<script>
+NexT.utils.loadComments(document.querySelector('#gitalk-container'), () => {
+  NexT.utils.getScript('//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js', () => {
+    var gitalk = new Gitalk({
+      clientID    : '4e08ebd1f034b2b45c2a',
+      clientSecret: '9d7ab5a16970e4c63a19635e9de3f69b75268d6e',
+      repo        : 'Gitalk',
+      owner       : 'shadylyf321',
+      admin       : ['shadylyf321'],
+      id          : '06f213f9967eba176eb808d53607d8d3',
+        language: 'zh-CN',
+      distractionFreeMode: true
+    });
+    gitalk.render('gitalk-container');
+  }, window.Gitalk);
+});
+</script>
+
+</body>
+</html>
